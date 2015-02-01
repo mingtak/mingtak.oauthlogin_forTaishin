@@ -9,7 +9,8 @@ from plone.registry.interfaces import IRegistry
 from Products.CMFPlone.utils import safe_unicode
 from oauthlib.oauth2 import TokenExpiredError
 import os; os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-
+from zope.event import notify
+from Products.PlonePAS.events import UserLoggedInEvent
 
 logger = logging.getLogger("mingtak.oauthlogin.browser.oauthLogin")
 
@@ -63,9 +64,12 @@ class FacebookLogin(BrowserView):
 
         # check has id, if True, is a relogin user, if False, is a new user
         userid = safe_unicode("fb%s") % user["id"]
-        if api.user.get(userid=userid) is not None:
+        userObject = api.user.get(userid=userid)
+        if userObject is not None:
             self.context.acl_users.session._setupSession(userid.encode("utf-8"), self.context.REQUEST.RESPONSE)
             self.request.RESPONSE.redirect("/")
+            # event handle, fired to UserLoggedInEvent
+            notify(UserLoggedInEvent(userObject))
             return
         userInfo = dict(
             fullname=safe_unicode(user.get("name", "")),
@@ -77,6 +81,8 @@ class FacebookLogin(BrowserView):
         oauthWorkFlow.createUser(userid, safe_unicode((user.get("email", ""))), userInfo)
         self.context.acl_users.session._setupSession(userid.encode("utf-8"), self.context.REQUEST.RESPONSE)
         self.request.RESPONSE.redirect("/")
+        # event handle, fired to UserLoggedInEvent
+        notify(UserLoggedInEvent(userObject))
         return
 
 
